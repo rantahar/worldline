@@ -3,7 +3,7 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-#include "../Thirring.h"
+#include "../worldline.h"
 int **field;
 int **diraclink;
 

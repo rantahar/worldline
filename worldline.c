@@ -10,51 +10,12 @@
 #include <fenv.h>
 #endif
 
-#include "Thirring.h"
-
-
-/* storage */
-int    ***eta;   //Staggered eta matrix
-double m;
-double U;
-double mu;
+#define MAIN
+#include "worldline.h"
+#include "SAD.h"
 
 char configuration_filename[100];
 
-/* LLR parameters */
-int llr_target;
-double llr_gaussian_weight = 5; // Used in thermalisation even with wall
-double llr_a = 0;             // The measurable a in the llr method
-int llr_constant_steps = 100; // Number of (roughly) constant steps at start
-double llr_alpha = 0.1;       // Step size
-
-/* Monomers and links
- * field stores both, 0 for empty, 1 for monomer and 2+dir for links
- */
-int n_monomers=0;
-int n_links=0;
-int **field;
-
-/* Fermion worldline links */
-int **diraclink;
-
-/* Size of the fluctuation matrix, used in measurements
- */
-int max_changes;
-
-/* Pseudofermion fields */
-double *psi,*chi;
-
-/* Neighbour index arrays, to be filled at the beginning
- */
-int *tup,*xup,*tdn,*xdn;
-
-
-/* Utility, print error and exit */
-void errormessage( char * message ){
-  fprintf( stderr, "%s", message );
-  exit(1);
-}
 
 
 /* Saves the current configuration in a file */
@@ -89,6 +50,13 @@ void read_configuration(char * filename){
     printf("Reading configuration\n");
     fread(buffer, 2*VOLUME, sizeof(int), config_file);
     fclose(config_file);
+
+    for (int t=0; t<NT; t++){
+      for (int x=0; x<NX; x++) {
+        field[t][x] = buffer[t*NX+x];
+        diraclink[t][x] = buffer[NT*NX+t*NX+x];
+      }
+    }
   } else {
     /* Create a cold configuration */
     printf("No configuration file, starting from a COLD state\n");
@@ -101,39 +69,15 @@ void read_configuration(char * filename){
     printf("Thermalising\n");
     thermalise(NX);
   }
-  for (int t=0; t<NT; t++){
-    for (int x=0; x<NX; x++) {
-      field[t][x] = buffer[t*NX+x];
-      diraclink[t][x] = buffer[NT*NX+t*NX+x];
-    }
-  }
   free(buffer);
 }
 
 
 
-/* Functions for fetching neighboring coordinates */
-static inline int tdir(int t, int dir){
-  if( dir == TUP ) return tup[t];
-  else if ( dir == TDN ) return tdn[t];
-  else return(t);
-}
-
-static inline int xdir(int x, int dir){
-  if( dir == XUP ) return xup[x];
-  else if ( dir == XDN ) return xdn[x];
-  else return(x);
-}
-
-/* Opposite of a direction */
-static inline int opp_dir(int dir){
-  return ( dir + ND ) % NDIRS;
-}
-
 /* Make a copy of the fields */
 int old_field[NT][NX];
 int old_diraclink[NT][NX];
-void save_field(){
+void save_config(){
   for( int x=0; x<NX; x++ ) for( int t=0; t<NT; t++ ){
     old_field[t][x] = field[t][x];
     old_diraclink[t][x] = diraclink[t][x];
@@ -141,17 +85,17 @@ void save_field(){
 }
 
 /* Restore the saved field */
-void restore_field(){
+void restore_config(){
   for( int x=0; x<NX; x++ ) for( int t=0; t<NT; t++ ){
     field[t][x] = old_field[t][x];
     diraclink[t][x] = old_diraclink[t][x];
   }
 }
 
+
 /* Turn a link on */
 static inline void link_on(int t, int x, int dir){
-  int t2 = tdir(t, dir);
-  int x2 = xdir(x, dir);
+  int t2 = tdir(t, dir), x2 = xdir(x, dir);
   if ( field[t][x] == 0 && field[t2][x2] == 0 ){
     field[t][x] = dir+2;
     field[t2][x2] = opp_dir(dir)+2;
@@ -165,8 +109,7 @@ static inline void link_on(int t, int x, int dir){
 
 /* Add two monomers */
 static inline void monomers_on(int t, int x, int dir){
-  int t2 = tdir(t, dir);
-  int x2 = xdir(x, dir);
+  int t2 = tdir(t, dir), x2 = xdir(x, dir);
   if ( field[t][x] == 0 && field[t2][x2] == 0 ){
     field[t][x] = MONOMER;
     field[t2][x2] = MONOMER;
@@ -229,7 +172,6 @@ int update_link_at(int s, int dir2)
         /* Replace with 2 opposing arrows */
         diraclink[t][x] = dir;
         diraclink[t2][x2] = opp_dir(dir);
-        n_links--;
         success = 1;
       }
     }
@@ -248,7 +190,6 @@ int update_link_at(int s, int dir2)
           link_on(t,x,dir);
           diraclink[t][x] = NDIRS;
           diraclink[t2][x2] = NDIRS;
-          n_links++;
           success = 1;
         }
       }
@@ -281,8 +222,6 @@ int update_monomers_at(int s, int dir)
         /* Replace with 2 opposing arrows */
         diraclink[t][x] = dir;
         diraclink[t2][x2] = opp_dir(dir);
-        n_monomers-=2;
-        success = 1;
       }
     }
   } else if( field[t][x] == 0 ) {
@@ -299,8 +238,6 @@ int update_monomers_at(int s, int dir)
           monomers_on(t,x,dir);
           diraclink[t][x] = NDIRS;
           diraclink[t2][x2] = NDIRS;
-          n_monomers+=2;
-          success = 1;
         }
       }
     }
@@ -333,7 +270,6 @@ int add_link_at(int t, int x)
         link_on(t,x,dir);
         diraclink[t][x] = NDIRS;
         diraclink[t2][x2] = NDIRS;
-        n_links++;
         success = 1;
       }
     }
@@ -358,7 +294,6 @@ int remove_link_at(int t, int x)
       /* Replace with 2 opposing arrows */
       diraclink[t][x] = dir;
       diraclink[t2][x2] = opp_dir(dir);
-      n_links--;
       success = 1;
     }
   }
@@ -429,10 +364,13 @@ int count_negative_loops(){
 }
 
 int configuration_sign(){
-  int sector = count_negative_loops();
-  return 1-2*(sector%2);
+  int sign = 1;
+  for(int t=0; t<NT; t++) for(int x=0;x<NX;x++) if(field[t][x]==0){
+    int dir = diraclink[t][x];
+    sign *= linksign(t,x,dir);
+  }
+  return sign;
 }
-
 
 
 /* Find a link pointing at a given site */
@@ -458,6 +396,10 @@ char init_parameter_filename[100];
 int current_sector = 0;
 int llr_accepted=0;
 int sector_changes=0;
+int range_lower=-1, range_higher=1e6;
+long WL_nstep=1;
+int last_range_update=1;
+#define SAD
 
 void init_sector_weights( double Weights[MAX_SECTOR], int max_init_steps ){
   for( int i=0; i<MAX_SECTOR; i++){
@@ -516,19 +458,16 @@ void WangLaundau_setup( int max_init_steps ){
         initialized = 1;
       }
     }
+    fscanf(config_file, "%ld %d\n", &WL_nstep, &last_range_update);
     fclose(config_file);
   }
 
   if( initialized == 0 ) {
     for( int s=0; s<MAX_SECTOR; s++){
       WangLaundau_iteration[s] = 0;
-      WL_measure_sector[s] = 1;
+      WL_measure_sector[s] = 0;
     }
-    init_free_energy( max_init_steps );
-  }
-
-  for( int i=0; i<MAX_SECTOR; i++) if(WL_measure_sector[i]) {
-    active_sector_free_energy += WangLaundau_F[i];
+    //init_free_energy( max_init_steps );
   }
 
   current_sector = count_negative_loops();
@@ -537,21 +476,12 @@ void WangLaundau_setup( int max_init_steps ){
 void WangLaundau_write_energy(){
   FILE * config_file;
 
-  double f0 = -active_sector_free_energy;
-  int n_active = 0;
-  for( int i=0; i<MAX_SECTOR; i++) if(WL_measure_sector[i]) {
-    f0 += WangLaundau_F[i];
-    n_active += 1;
-  }
-  for( int i=0; i<MAX_SECTOR; i++) if(WL_measure_sector[i]) {
-    WangLaundau_F[i] -= f0/n_active;
-  }
-
   config_file = fopen(init_parameter_filename,"wb");
   if (config_file){
     for( int s=0; s<MAX_SECTOR; s++){
-      fprintf(config_file, "%g %d %d\n", WangLaundau_F[s], WangLaundau_iteration[s], WL_measure_sector[s]);
+      fprintf(config_file, "%g %ld %d\n", WangLaundau_F[s], WangLaundau_iteration[s], WL_measure_sector[s]);
     }
+    fprintf(config_file, "%d %d\n", WL_nstep, last_range_update);
     fclose(config_file);
   } else {
     printf("Could not write configuration\n");
@@ -561,19 +491,79 @@ void WangLaundau_write_energy(){
 
 // Update the free energy in the Wang-Landau algorithm
 void WangLaundau_update(sector){
+#ifdef SAD
+  int max_sector, max_histogram = 0;
+  double Tmin = 100;
+  double Ns;
+  double step;
+  double tolerance = -40;
+  double maximum = -10000;
+
+  if( WL_nstep==1 ){ // first call
+    step = 1;
+    WL_measure_sector[sector] = 1;
+    WangLaundau_F[sector] += step;
+    WangLaundau_iteration[sector]++;
+    WL_nstep++;
+    return;
+  }
+
+  for( int s=0; s<MAX_SECTOR; s++){
+    if( WangLaundau_iteration[s] > max_histogram ){
+      max_histogram = WangLaundau_iteration[s];
+      max_sector = s;
+    }
+  }
+  
+  if( !WL_measure_sector[max_sector] ){
+    WL_measure_sector[max_sector] = 1;
+    last_range_update = WL_nstep;
+    printf("New sector %d %d\n", max_sector, WL_nstep);
+  }
+
+  WangLaundau_iteration[sector]++;
+  
+  if( WL_measure_sector[sector] ){
+    double Ns = 1;
+    for( int s=0; s<MAX_SECTOR; s++ ){
+      Ns += WL_measure_sector[sector];
+    }
+    double t0 = Ns/Tmin;
+    double st2 = (double) WL_nstep * (double) WL_nstep;
+    double l = last_range_update;
+    double e = t0 + WL_nstep/l;
+    double d = t0 + st2/(Ns*l);
+    step = llr_alpha*e/d;
+    //printf("SAD %g %d %d %g %g\n", step, last_range_update, WL_nstep, e, d);
+    WangLaundau_F[sector] += step;
+    if( step <= 0 ){
+      printf("Negative step in SAD %g %g %g\n",step, e, d);
+      exit(1);
+    }
+
+    for( int s=0; s<MAX_SECTOR; s++)
+      if( WangLaundau_F[s] > maximum )
+        maximum = WangLaundau_F[s];
+    for( int s=0; s<MAX_SECTOR; s++){
+      WangLaundau_F[s] -= maximum;
+      if( WangLaundau_F[s] < tolerance ){
+        WangLaundau_F[s] = tolerance;
+      }
+    }
+  }
+  WL_nstep++;
+
+#else
   if( WL_measure_sector[sector] ){
     double step = llr_alpha/(WangLaundau_iteration[sector]+llr_constant_steps);
     WangLaundau_F[sector] += step;
     WangLaundau_iteration[sector]++;
   }
+#endif
 }
 
-
-
 double WangLaundau_weight(new_sector,old_sector){
-  double weight;
-  weight = exp(-WangLaundau_F[new_sector]+WangLaundau_F[old_sector]);
-  return weight;
+  return exp(WangLaundau_F[old_sector]-WangLaundau_F[new_sector]);
 }
 
 
@@ -725,7 +715,6 @@ void dirac_worm_add_monomer( int *t, int *x ){
         diraclink[*t][*x] = NDIRS;
         diraclink[t2][x2] = 10;
         *t=t2; *x=x2;
-        n_monomers += 1;
       }
     }
   } else if( field[t2][x2] == MONOMER ){
@@ -735,7 +724,6 @@ void dirac_worm_add_monomer( int *t, int *x ){
       diraclink[*t][*x] = dir;
       diraclink[t2][x2] = 10;
       *t=t2; *x=x2;
-      n_monomers -= 1;
     }
   }
 }
@@ -772,7 +760,6 @@ int update_dirac_background(){
       if( mersenne() < p ){
         field[t][x] = 0;
         diraclink[t][x] = 10;
-        n_monomers -= 1;
         t0 = t; x0 = x;
         started = 1;
       }
@@ -809,7 +796,6 @@ int update_dirac_background(){
             if( mersenne() < p ){
               field[t][x] = MONOMER;
               diraclink[t][x] = NDIRS;
-              n_monomers += 1;
               break;
             }
           }
@@ -981,23 +967,15 @@ void thermalise( int nsteps ){
 int update( int nsteps )
 {
   int changes=0;
-  save_field();
+  save_config();
 
   for( int i=0; i<nsteps; i++ ){
-  if( mersenne() < 0 ){
-      /* local updates */
-    changes += update_monomer();
-    changes += update_link();
-    changes += plaquette_update();
-    changes += flip_loop();
-  } else {
     /* Worm update */
     changes += update_dirac_background();
   }
-  }
 
   if( ! llr_accept() ){
-    restore_field();
+    restore_config();
   }
 
 
@@ -1280,6 +1258,12 @@ double measure_susceptibility_with_background( ){
   #ifdef OPENX
   int nsteps = 0;
   int n_attempts = 1;
+  int n_links = 0;
+  for (int t=0; t<NT; t++) for (int x=0; x<NX; x++) {
+    if(field[t][x] >= LINK_TUP){
+      n_links +=1;
+    }
+  }
   double scale_factor = n_links/(2.*VOLUME*n_attempts);
   
   for(int i=0; i<n_attempts;i++){
@@ -1387,7 +1371,7 @@ void get_char( char * name, char * dest ){
 
 
 
-void setup_lattice(int seed){
+void setup_lattice(long seed){
   /* "Warm up" the rng generator */
   seed_mersenne( seed );
   for (int i=0; i<543210; i++) mersenne();
@@ -1614,6 +1598,18 @@ int main(int argc, char* argv[])
       sum_susc_wb += sign*measure_susceptibility_with_background();
     #endif
 
+    int n_monomers = 0, n_links = 0;
+    for (int t=0; t<NT; t++){
+      for (int x=0; x<NX; x++) {
+        if(field[t][x] == MONOMER){
+          n_monomers +=1;
+        }
+        if(field[t][x] >= LINK_TUP){
+          n_links +=1;
+        }
+      }
+    }
+
     sum_monomers += sign*n_monomers;
     sum_links += sign*n_links;
 
@@ -1654,9 +1650,9 @@ int main(int argc, char* argv[])
       printf("LLR a_%d = %g, exp(a) = %g\n", llr_target, llr_a_ave, exp(llr_a_ave));
       sum_llr_a = 0;
       #elif WANGLANDAU
-      for(int s=0; s<=MAX_SECTOR; s++) if(WL_measure_sector[s]) {
-        printf("WANGLANDAU SECTOR %d %g \n", s, WangLaundau_F[s]);
-      }
+      //for(int s=0; s<=MAX_SECTOR; s++) if(WL_measure_sector[s]) {
+      //  printf("WANGLANDAU SECTOR %d %g \n", s, WangLaundau_F[s]);
+      //}
       WangLaundau_write_energy();
       #elif MEASURE_SECTOR
       #else

@@ -3,7 +3,7 @@ CC=gcc
 CFLAGS= -march=native -Wall -Wextra -std=c99 -O3
 LIB= -lm
 
-DEPS=Makefile Thirring.h mersenne.h
+DEPS=Makefile worldline.h mersenne.h
 
 default: Thirring Thirring_exp
 
