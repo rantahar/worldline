@@ -23,14 +23,11 @@ worldline: worldline.o mersenne_inline.o $(DEPS)
 worldline_llr.o: worldline.c $(DEPS)
 	$(CC) $(CFLAGS) -DLLR -c -o $@ $< $(CFLAGS)
 
-worldline_llr: worldline_llr.o mersenne_inline.o  $(DEPS)
-	$(CC) $(CFLAGS) -DLLR -o worldline_llr worldline_llr.o mersenne_inline.o $(LIB)
+LLR: LLR.o mersenne_inline.o worldline_llr.o  $(DEPS)
+	$(CC) $(CFLAGS) -o LLR LLR.o worldline_llr.o mersenne_inline.o $(LIB)
 
-worldline_WL.o: worldline.c $(DEPS)
-	$(CC) $(CFLAGS) -DWANGLANDAU -c -o $@ $< $(CFLAGS)
-
-worldline_WL: worldline_WL.o mersenne_inline.o  $(DEPS)
-	$(CC) $(CFLAGS) -DWANGLANDAU -o worldline_WL worldline_WL.o mersenne_inline.o $(LIB)
+wanglandau: wanglandau.o worldline.o mersenne_inline.o  $(DEPS)
+	$(CC) $(CFLAGS) -o wanglandau wanglandau.o worldline.o mersenne_inline.o $(LIB)
 
 worldline_sector.o: worldline.c $(DEPS)
 	$(CC) $(CFLAGS) -DMEASURE_SECTOR -c -o $@ $< $(CFLAGS)
