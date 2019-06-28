@@ -3,9 +3,20 @@
 #define MAIN
 
 #include "worldline.h"
-#include "SAD.h"
 
-double active_sector_free_energy;
+
+double llr_gaussian_weight; // Used in thermalisation even with wall
+int constant_steps; // Number of (roughly) constant steps at start
+double stepsize;       // Step size
+double WangLaundau_F[MAX_SECTOR];
+long WangLaundau_iteration[MAX_SECTOR];
+int WL_measure_sector[MAX_SECTOR];
+char parameter_filename[100];
+int current_sector;
+int WL_accepted;
+int sector_changes;
+long WL_nstep;
+int last_range_update;
 
 
 void init_sector_weights( double Weights[MAX_SECTOR], int max_init_steps ){
@@ -51,7 +62,7 @@ void init_free_energy( int max_init_steps ){
 
 void WangLaundau_setup( int max_init_steps ){
   FILE *config_file;
-  config_file = fopen(init_parameter_filename, "rb");
+  config_file = fopen(parameter_filename, "rb");
   int initialized = 0;
   
   if(config_file) {
@@ -74,13 +85,13 @@ void WangLaundau_setup( int max_init_steps ){
     //init_free_energy( max_init_steps );
   }
 
-  current_sector = count_negative_loops();
+  current_sector = negative_loops();
 }
 
 void WangLaundau_write_energy(){
   FILE * config_file;
 
-  config_file = fopen(init_parameter_filename,"wb");
+  config_file = fopen(parameter_filename,"wb");
   if (config_file){
     for( int s=0; s<MAX_SECTOR; s++){
       fprintf(config_file, "%g %ld %d\n", WangLaundau_F[s], WangLaundau_iteration[s], WL_measure_sector[s]);
@@ -137,7 +148,7 @@ void WangLaundau_update(sector){
     double l = last_range_update;
     double e = t0 + WL_nstep/l;
     double d = t0 + st2/(Ns*l);
-    step = llr_alpha*e/d;
+    step = stepsize*e/d;
     //printf("SAD %g %d %d %g %g\n", step, last_range_update, WL_nstep, e, d);
     WangLaundau_F[sector] += step;
     if( step <= 0 ){
@@ -159,7 +170,7 @@ void WangLaundau_update(sector){
 
 #else
   if( WL_measure_sector[sector] ){
-    double step = llr_alpha/(WangLaundau_iteration[sector]+llr_constant_steps);
+    double step = stepsize/(WangLaundau_iteration[sector]+constant_steps);
     WangLaundau_F[sector] += step;
     WangLaundau_iteration[sector]++;
   }
@@ -171,11 +182,11 @@ double WangLaundau_weight(new_sector,old_sector){
 }
 
 
-int llr_accept(){
+int WL_accept(){
   int accept = 1;
   int sector;
   double weight;
-  sector = count_negative_loops();
+  sector = negative_loops();
   if( sector != current_sector ){
     weight = WangLaundau_weight(sector,current_sector);
     if( mersenne() < weight ){
@@ -187,15 +198,10 @@ int llr_accept(){
     }
   }
   if( accept ){
-    llr_accepted += 1;
+    WL_accepted += 1;
   }
   return accept;
 }
-
-int negative_loops(){
-  return current_sector;
-}
-
 
 
 /* A full update function. A single worm update followed by a number of random
@@ -207,7 +213,7 @@ int update( int nsteps )
 
   changes += update_config(nsteps);
 
-  if( ! llr_accept() ){
+  if( ! WL_accept() ){
     restore_config();
   }
 
@@ -224,7 +230,7 @@ int main(int argc, char* argv[])
   #endif 
 
   current_sector  = 0;
-  llr_accepted =0;
+  WL_accepted =0;
   sector_changes =0;
   WL_nstep =1;
   last_range_update =1;
@@ -236,19 +242,11 @@ int main(int argc, char* argv[])
   get_int("Number of updates", &n_loops);
   get_int("Updates / measurement", &n_measure);
   get_int("Average over", &n_average);
-
   get_double("mass", &m);
   get_double("U", &U);
   get_double("mu", &mu);
-
   get_long("Random seed", &seed);
-
   get_char(" Configuration filename ", configuration_filename);
-
-
-  get_double("Wang Landau step size", &llr_alpha);
-  get_int("Wang Landau steps with dampened decay", &llr_constant_steps);
-  get_char(" Initial values file ", init_parameter_filename);
 
   printf(" \n++++++++++++++++++++++++++++++++++++++++++\n");
   //printf(" Git commit ID GIT_COMMIT_ID  \n");
@@ -257,12 +255,17 @@ int main(int argc, char* argv[])
   printf(" m %f \n", m);
   printf(" U %f \n", U);
   printf(" mu %f \n", mu);
-  printf(" Size of fluctuation matrix %d\n", max_changes );
   printf(" Random seed %ld\n", seed );
   printf(" Configuration file %s\n", configuration_filename );
-  printf(" Wang Landau step size %g\n", llr_alpha );
-  printf(" Wang Landau %d first steps with dampened decay\n", llr_constant_steps );
-  printf(" Wang Landau weight file %s\n", init_parameter_filename );
+
+
+  get_double("Wang Landau step size", &stepsize);
+  get_int("Wang Landau steps with dampened decay", &constant_steps);
+  get_char(" Initial values file ", parameter_filename);
+
+  printf(" Wang Landau step size %g\n", stepsize );
+  printf(" Wang Landau %d first steps with dampened decay\n", constant_steps );
+  printf(" Wang Landau weight file %s\n", parameter_filename );
 
   
   // Set up lattice variables and fields
@@ -289,7 +292,7 @@ int main(int argc, char* argv[])
 
     gettimeofday(&start,NULL);
 
-    int sector = negative_loops();
+    int sector = current_sector;
     int sign = 1-(sector%2)*2;
     sum_sign += sign;
 
@@ -302,8 +305,8 @@ int main(int argc, char* argv[])
     if(i%n_average==0){
       printf("\n%d, %d updates in %.3g seconds\n", i*n_measure, n_average*n_measure, 1e-6*updatetime);
       printf("%d, %d measurements in %.3g seconds\n", i*n_measure, n_average, 1e-6*measuretime);
-      printf("%d, acceptance %.3g, sector change rate %.3g \n", i*n_measure, (double)llr_accepted/n_average, (double)sector_changes/n_average);
-      llr_accepted = 0; sector_changes = 0;
+      printf("%d, acceptance %.3g, sector change rate %.3g \n", i*n_measure, (double)WL_accepted/n_average, (double)sector_changes/n_average);
+      WL_accepted = 0; sector_changes = 0;
 
       updatetime = 0; measuretime = 0;
 

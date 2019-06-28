@@ -17,24 +17,18 @@ tests: tests/test_worldline
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-worldline: worldline.o mersenne_inline.o $(DEPS)
-	$(CC) $(CFLAGS) -o worldline worldline.o mersenne_inline.o $(LIB)
+montecarlo: montecarlo.o worldline.o mersenne_inline.o $(DEPS)
+	$(CC) $(CFLAGS) -o montecarlo montecarlo.o worldline.o mersenne_inline.o $(LIB)
 
-worldline_llr.o: worldline.c $(DEPS)
-	$(CC) $(CFLAGS) -DLLR -c -o $@ $< $(CFLAGS)
-
-LLR: LLR.o mersenne_inline.o worldline_llr.o  $(DEPS)
-	$(CC) $(CFLAGS) -o LLR LLR.o worldline_llr.o mersenne_inline.o $(LIB)
+LLR: LLR.o worldline.o mersenne_inline.o $(DEPS)
+	$(CC) $(CFLAGS) -o LLR LLR.o worldline.o mersenne_inline.o $(LIB)
 
 wanglandau: wanglandau.o worldline.o mersenne_inline.o  $(DEPS)
 	$(CC) $(CFLAGS) -o wanglandau wanglandau.o worldline.o mersenne_inline.o $(LIB)
 
-worldline_sector.o: worldline.c $(DEPS)
-	$(CC) $(CFLAGS) -DMEASURE_SECTOR -c -o $@ $< $(CFLAGS)
-
-worldline_sector: worldline_sector.o mersenne_inline.o  $(DEPS)
-	$(CC) $(CFLAGS) -DMEASURE_SECTOR -o worldline_sector worldline_sector.o mersenne_inline.o $(LIB)
-
+measure_sector: measure_sector.o worldline.o mersenne_inline.o  $(DEPS)
+	$(CC) $(CFLAGS) -o measure_sector measure_sector.o worldline.o mersenne_inline.o $(LIB)
 
 clean:
-	rm -f *.o  
+	rm -f *.o 
+	rm -f montecarlo LLR wanglandau measure_sector

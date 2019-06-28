@@ -71,13 +71,12 @@ EXTERN char configuration_filename[100];
 /* Worldline functions */
 void setup_lattice(long seed);
 int configuration_sign();
-int count_negative_loops();
 int update_config( int nsteps );
 void thermalise( int nsteps );
 void write_configuration(char * filename);
 void read_configuration(char * filename);
 void save_config();
 void restore_config();
-
+int negative_loops();
 
 #endif

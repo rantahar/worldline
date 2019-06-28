@@ -1,7 +1,16 @@
 #define MAIN
-#define LLR
-#include "LLR.h"
 
+#include "worldline.h"
+
+
+int llr_target;
+double llr_gaussian_weight = 5; // Used in thermalisation even with wall
+double llr_a = 0;             // The measurable a in the llr method
+int llr_constant_steps = 100; // Number of (roughly) constant steps at start
+double llr_alpha = 0.1;       // Step size
+int current_sector;
+int llr_accepted;
+int sector_changes;
 
 
 // In LLR, modify the acceptance rate based on the
@@ -35,7 +44,7 @@ int llr_accept(){
   int accept = 1;
   int sector;
   double current_distance, previous_distance, weight;
-  sector = count_negative_loops();
+  sector = negative_loops();
   if( sector != current_sector ){
     weight = LLR_weight(sector)/LLR_weight(current_sector);
     if( mersenne() < weight ){
@@ -52,8 +61,21 @@ int llr_accept(){
   return accept;
 }
 
-int negative_loops(){
-  return current_sector;
+
+
+/* Perform an update and accept/reject */
+int update( int nsteps )
+{
+  int changes=0;
+  save_config();
+
+  changes += update_config(nsteps);
+
+  if( ! llr_accept() ){
+    restore_config();
+  }
+
+  return changes;
 }
 
 
@@ -78,15 +100,9 @@ int main(int argc, char* argv[])
   get_double("mu", &mu);
 
   get_long("Random seed", &seed);
-
   get_char(" Configuration filename ", configuration_filename);
 
 
-  get_double("LLR step size", &llr_alpha);
-  get_int("LLR steps with dampened decay", &llr_constant_steps);
-  get_int("Target LLR sector", &llr_target);
-  get_double("LLR initial a", &llr_a);
-  get_int("Updates / LLR update", &llr_update_every);
 
   printf(" \n++++++++++++++++++++++++++++++++++++++++++\n");
   //printf(" Git commit ID GIT_COMMIT_ID  \n");
@@ -95,9 +111,15 @@ int main(int argc, char* argv[])
   printf(" m %f \n", m);
   printf(" U %f \n", U);
   printf(" mu %f \n", mu);
-  printf(" Size of fluctuation matrix %d\n", max_changes );
   printf(" Random seed %ld\n", seed );
   printf(" Configuration file %s\n", configuration_filename );
+
+  get_double("LLR step size", &llr_alpha);
+  get_int("LLR steps with dampened decay", &llr_constant_steps);
+  get_int("Target LLR sector", &llr_target);
+  get_double("LLR initial a", &llr_a);
+  get_int("Updates / LLR update", &llr_update_every);
+
   printf(" LLR target %d\n", llr_target );
   printf(" LLR updated every %ld updates\n", llr_update_every );
   printf(" LLR step size %g\n", llr_alpha );
@@ -120,9 +142,9 @@ int main(int argc, char* argv[])
     // Wait for the target sector to be reached before
     // starting measurement runs
   
-    update_config( 1 );
+    update( 1 );
   
-    sector = count_negative_loops();
+    sector = current_sector;
     if( sector == llr_target || sector == llr_target+1 ) {
       break;
     }
@@ -143,7 +165,7 @@ int main(int argc, char* argv[])
   for (i=1; i<n_loops+1; i++) {
 
     /* Update */
-    update_config(n_measure);
+    update(n_measure);
 
     /* Time and report */
     gettimeofday(&end,NULL);
@@ -151,7 +173,7 @@ int main(int argc, char* argv[])
 
     gettimeofday(&start,NULL);
 
-    int sector = negative_loops();
+    int sector = current_sector;
     int sign = 1-(sector%2)*2;
     sum_sign += sign;
 
