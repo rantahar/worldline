@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
   feenableexcept(FE_INVALID | FE_OVERFLOW);
   #endif 
 
-  int i,n_loops,n_measure,n_averaged;
+  int i,n_loops,n_measure,n_average;
   long seed;
 
   /* Read in the input */
@@ -82,7 +82,6 @@ int main(int argc, char* argv[])
   printf(" mu %f \n", mu);
   printf(" Random seed %ld\n", seed );
   printf(" Configuration file %s\n", configuration_filename );
-
 
   get_int("Target sector", &target_sector);
   printf(" Measuring expectation values in sector %d\n", target_sector );

@@ -103,7 +103,6 @@ int main(int argc, char* argv[])
   get_char(" Configuration filename ", configuration_filename);
 
 
-
   printf(" \n++++++++++++++++++++++++++++++++++++++++++\n");
   //printf(" Git commit ID GIT_COMMIT_ID  \n");
   printf(" 2D Thirring model, ( %d , %d ) lattice\n", NT, NX );
