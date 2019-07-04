@@ -18,8 +18,8 @@ void setup_free_energy( ){
   if(config_file) {
     printf(" Reading initial free energy\n" );
     for( int s=0; s<MAX_SECTOR; s++){
-      long tmp1; int tmp2;
-      fscanf(config_file, "%lf %ld %d\n", &Sampling_F[s], &tmp1, &tmp2);
+      char tmp1[100];
+      fscanf(config_file, "%lf %s\n", &Sampling_F[s], tmp1);
     }
     fclose(config_file);
   } else {
@@ -103,6 +103,7 @@ int main(int argc, char* argv[])
   double sectors[MAX_SECTOR];
   for(int i=0; i<MAX_SECTOR; i++){
     sectors[i] = 0;
+    printf("Free energy %d %g\n", i, Sampling_F[i]);
   }
 
   struct timeval start, end;
