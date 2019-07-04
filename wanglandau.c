@@ -113,10 +113,11 @@ void WangLaundau_write_energy(){
 // Update the free energy in the Wang-Landau algorithm
 void WangLaundau_update(sector){
   double maximum = -10000;
-#ifdef SAD
   double  min_F = 10000;
   double step;
   int Ns = 1;
+
+  WangLaundau_iteration[sector]++;
 
   for( int s=0; s<MAX_SECTOR; s++){
     if( WangLaundau_F[s] < min_F ){
@@ -136,7 +137,8 @@ void WangLaundau_update(sector){
     max_Ns = Ns;
   }
   
-  WangLaundau_iteration[sector]++;
+#ifdef SAD
+
   
   double t0 = max_Ns/Tmin;
   double st2 = (double) WL_nstep * (double) WL_nstep;
@@ -152,9 +154,8 @@ void WangLaundau_update(sector){
   }
 
 #else
-  double step = stepsize*constant_steps/(WangLaundau_iteration[sector]+constant_steps);
+  step = stepsize*max_Ns*constant_steps/(WL_nstep+max_Ns*constant_steps);
   WangLaundau_F[sector] += step;
-  WangLaundau_iteration[sector]++;
 #endif
 
   for( int s=0; s<MAX_SECTOR; s++)
