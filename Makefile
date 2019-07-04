@@ -38,4 +38,7 @@ montecarlobiased: montecarlobiased.o worldline.o mersenne_inline.o $(DEPS)
 
 clean:
 	rm -f *.o 
+
+cleanall:
+	rm -f *.o 
 	rm -f montecarlo LLR wanglandau measure_sector montecarlobiased gauged 
