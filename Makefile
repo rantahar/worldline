@@ -29,6 +29,9 @@ wanglandau: wanglandau.o worldline.o mersenne_inline.o  $(DEPS)
 measure_sector: measure_sector.o worldline.o mersenne_inline.o  $(DEPS)
 	$(CC) $(CFLAGS) -o measure_sector measure_sector.o worldline.o mersenne_inline.o $(LIB)
 
+gauged: gauged.o worldline.o mersenne_inline.o $(DEPS)
+	$(CC) $(CFLAGS) -o gauged gauged.o worldline.o mersenne_inline.o $(LIB)
+
 clean:
 	rm -f *.o 
 	rm -f montecarlo LLR wanglandau measure_sector
