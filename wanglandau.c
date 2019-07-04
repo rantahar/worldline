@@ -1,6 +1,7 @@
 
 
 #define MAIN
+//#define SAD
 
 #include "worldline.h"
 
@@ -17,6 +18,10 @@ int WL_accepted;
 int sector_changes;
 long WL_nstep;
 int last_range_update;
+double Tmin = 10;
+double tolerance = -40;
+int max_Ns=1;
+
 
 
 void init_sector_weights( double Weights[MAX_SECTOR], int max_init_steps ){
@@ -68,12 +73,13 @@ void WangLaundau_setup( int max_init_steps ){
   if(config_file) {
     printf(" Reading initial free energy\n" );
     for( int s=0; s<MAX_SECTOR; s++){
-      fscanf(config_file, "%lf %ld %d\n", &WangLaundau_F[s], &WangLaundau_iteration[s], &WL_measure_sector[s]);
+      fscanf(config_file, "%lf %ld\n", &WangLaundau_F[s], &WangLaundau_iteration[s]);
       if( WangLaundau_iteration[s] > 0 ){
         initialized = 1;
       }
     }
-    fscanf(config_file, "%ld %d\n", &WL_nstep, &last_range_update);
+    fscanf(config_file, "%ld %d %d\n", &WL_nstep, &last_range_update, &max_Ns);
+    //printf("%d %d %d\n", WL_nstep, last_range_update, max_Ns);
     fclose(config_file);
   }
 
@@ -94,9 +100,9 @@ void WangLaundau_write_energy(){
   config_file = fopen(parameter_filename,"wb");
   if (config_file){
     for( int s=0; s<MAX_SECTOR; s++){
-      fprintf(config_file, "%g %ld %d\n", WangLaundau_F[s], WangLaundau_iteration[s], WL_measure_sector[s]);
+      fprintf(config_file, "%g %ld\n", WangLaundau_F[s], WangLaundau_iteration[s]);
     }
-    fprintf(config_file, "%d %d\n", WL_nstep, last_range_update);
+    fprintf(config_file, "%d %d %d\n", WL_nstep, last_range_update, max_Ns);
     fclose(config_file);
   } else {
     printf("Could not write Wang Landau energy\n");
@@ -106,75 +112,61 @@ void WangLaundau_write_energy(){
 
 // Update the free energy in the Wang-Landau algorithm
 void WangLaundau_update(sector){
-#ifdef SAD
-  int max_sector, max_histogram = 0;
-  double Tmin = 100;
-  double Ns;
-  double step;
-  double tolerance = -40;
   double maximum = -10000;
+#ifdef SAD
+  double  min_F = 10000;
+  double step;
+  int Ns = 1;
 
-  if( WL_nstep==1 ){ // first call
-    step = 1;
-    WL_measure_sector[sector] = 1;
-    WangLaundau_F[sector] += step;
-    WangLaundau_iteration[sector]++;
-    WL_nstep++;
-    return;
+  for( int s=0; s<MAX_SECTOR; s++){
+    if( WangLaundau_F[s] < min_F ){
+      min_F = WangLaundau_F[s];
+    }
   }
 
   for( int s=0; s<MAX_SECTOR; s++){
-    if( WangLaundau_iteration[s] > max_histogram ){
-      max_histogram = WangLaundau_iteration[s];
-      max_sector = s;
-    }
+    if( WangLaundau_F[s] > (min_F+0.1) ){
+      Ns+=1;
+      WL_measure_sector[s] = 1;
+    } 
+  }
+  if( Ns > max_Ns ){
+    printf("New sectors %d %d\n", WL_nstep, Ns);
+    last_range_update = WL_nstep;
+    max_Ns = Ns;
   }
   
-  if( !WL_measure_sector[max_sector] ){
-    WL_measure_sector[max_sector] = 1;
-    last_range_update = WL_nstep;
-    printf("New sector %d %d\n", max_sector, WL_nstep);
-  }
-
   WangLaundau_iteration[sector]++;
   
-  if( WL_measure_sector[sector] ){
-    double Ns = 1;
-    for( int s=0; s<MAX_SECTOR; s++ ){
-      Ns += WL_measure_sector[sector];
-    }
-    double t0 = Ns/Tmin;
-    double st2 = (double) WL_nstep * (double) WL_nstep;
-    double l = last_range_update;
-    double e = t0 + WL_nstep/l;
-    double d = t0 + st2/(Ns*l);
-    step = stepsize*e/d;
-    //printf("SAD %g %d %d %g %g\n", step, last_range_update, WL_nstep, e, d);
-    WangLaundau_F[sector] += step;
-    if( step <= 0 ){
-      printf("Negative step in SAD %g %g %g\n",step, e, d);
-      exit(1);
-    }
+  double t0 = max_Ns/Tmin;
+  double st2 = (double) WL_nstep * (double) WL_nstep;
+  double l = last_range_update;
+  double e = t0 + WL_nstep/l;
+  double d = t0 + st2/(max_Ns*l);
+  step = e/d;
+  printf("SAD %g %d %d %g %g %g\n", step, last_range_update, WL_nstep, t0, e, d);
+  WangLaundau_F[sector] += step;
+  if( step <= 0 ){
+    printf("Negative step in SAD %g %g %g\n",step, e, d);
+    exit(1);
+  }
 
-    for( int s=0; s<MAX_SECTOR; s++)
-      if( WangLaundau_F[s] > maximum )
-        maximum = WangLaundau_F[s];
-    for( int s=0; s<MAX_SECTOR; s++){
-      WangLaundau_F[s] -= maximum;
-      if( WangLaundau_F[s] < tolerance ){
-        WangLaundau_F[s] = tolerance;
-      }
+#else
+  double step = stepsize*constant_steps/(WangLaundau_iteration[sector]+constant_steps);
+  WangLaundau_F[sector] += step;
+  WangLaundau_iteration[sector]++;
+#endif
+
+  for( int s=0; s<MAX_SECTOR; s++)
+    if( WangLaundau_F[s] > maximum )
+      maximum = WangLaundau_F[s];
+  for( int s=0; s<MAX_SECTOR; s++){
+    WangLaundau_F[s] -= maximum;
+    if( WangLaundau_F[s] < tolerance ){
+      WangLaundau_F[s] = tolerance;
     }
   }
   WL_nstep++;
-
-#else
-  if( WL_measure_sector[sector] ){
-    double step = stepsize/(WangLaundau_iteration[sector]+constant_steps);
-    WangLaundau_F[sector] += step;
-    WangLaundau_iteration[sector]++;
-  }
-#endif
 }
 
 double WangLaundau_weight(new_sector,old_sector){
@@ -246,7 +238,17 @@ int main(int argc, char* argv[])
   get_double("U", &U);
   get_double("mu", &mu);
   get_long("Random seed", &seed);
-  get_char(" Configuration filename ", configuration_filename);
+  get_char("Configuration filename ", configuration_filename);
+
+  #ifdef SAD
+  get_double("Wang Landau Tmin", &Tmin);
+  #else
+  get_int("Wang Landay t0", &constant_steps);
+  get_double("Wang Landau stepsize", &stepsize);
+  #endif
+  get_double("Wang Landau tolerance", &tolerance);
+  get_char("Initial values file ", parameter_filename);
+
 
   printf(" \n++++++++++++++++++++++++++++++++++++++++++\n");
   //printf(" Git commit ID GIT_COMMIT_ID  \n");
@@ -257,14 +259,8 @@ int main(int argc, char* argv[])
   printf(" mu %f \n", mu);
   printf(" Random seed %ld\n", seed );
   printf(" Configuration file %s\n", configuration_filename );
-
-
-  get_double("Wang Landau step size", &stepsize);
-  get_int("Wang Landau steps with dampened decay", &constant_steps);
-  get_char(" Initial values file ", parameter_filename);
-
-  printf(" Wang Landau step size %g\n", stepsize );
-  printf(" Wang Landau %d first steps with dampened decay\n", constant_steps );
+  printf(" Wang Landau tolerance %g\n", tolerance );
+  printf(" Wang Landau Tmin %g\n", Tmin );
   printf(" Wang Landau weight file %s\n", parameter_filename );
 
   
