@@ -1032,7 +1032,20 @@ double measure_susceptibility_with_background( ){
 
 
 
-void setup_lattice(long seed){
+void setup_lattice(){
+  /* Read lattice size */
+  long seed;
+  get_int("Sites in the t direction", &NT);
+  get_int("Sites in the x direction", &NX);
+  get_long("Random seed", &seed);
+  get_char("Configuration filename ", configuration_filename);
+
+  printf("\n++++++++++++++++++++++++++++++++++++++++++\n");
+  //printf(" Git commit ID GIT_COMMIT_ID  \n");
+  printf(" 2D Thirring model, ( %d , %d ) lattice\n", NT, NX );
+  printf(" Random seed %ld\n", seed );
+  printf(" Configuration file %s\n", configuration_filename );
+
   /* "Warm up" the rng generator */
   seed_mersenne( seed );
   for (int i=0; i<543210; i++) mersenne();
@@ -1096,8 +1109,22 @@ void setup_lattice(long seed){
     diraclink[t][NX] = EMPTY;
   }
   #endif
+
+  // Set up lattice variables and fields
+  read_configuration(configuration_filename);
 }
 
+
+/* Read parameters for Thirring model */
+void read_thirring_parameters(){
+  get_double("mass", &m);
+  get_double("U", &U);
+  get_double("mu", &mu);
+
+  printf("\n m %f \n", m);
+  printf(" U %f \n", U);
+  printf(" mu %f \n", mu);
+}
 
 
 

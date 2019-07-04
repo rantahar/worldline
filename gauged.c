@@ -59,39 +59,26 @@ int main(void){
   #endif 
 
   int i,n_loops,n_measure,n_average;
-  long seed;
-
-  U=0; // Need a better way to disable dimers?
     
   /* Read in the input */
-  get_int("Sites in the t direction", &NT);
-  get_int("Sites in the x direction", &NX);
+  setup_lattice();
+
+  /* Read in the input */
   get_int("Number of updates", &n_loops);
   get_int("Updates / measurement", &n_measure);
-  get_int("Average over", &n_average);
+  get_int("Updates between saves", &n_average);
+  printf("\n %d updates per measurements\n", n_measure );
 
   get_double("mass", &m);
   get_double("g", &g);
   get_double("mu", &mu);
-
-  get_long("Random seed", &seed);
-  get_char("Configuration filename ", configuration_filename);
-
-  printf(" \n++++++++++++++++++++++++++++++++++++++++++\n");
-  //printf(" Git commit ID GIT_COMMIT_ID  \n");
-  printf(" 2D Thirring model, ( %d , %d ) lattice\n", NT, NX );
-  printf(" %d updates per measurements\n", n_measure );
-  printf(" m %f \n", m);
+  U=0; // Need a better way to disable dimers?
+  printf("\n m %f \n", m);
   printf(" G %f \n", g);
   printf(" mu %f \n", mu);
-  printf(" Random seed %ld\n", seed );
-  printf(" Configuration file %s\n", configuration_filename );
 
+  printf(" %d updates per measurements\n", n_measure );
   
-  // Set up lattice variables and fields
-  setup_lattice(seed);
-  read_configuration(configuration_filename);
-    
   A = malloc( NT*sizeof(int **) );
   for (int t=0; t<NT; t++){
     A[t] = malloc( NX*sizeof(int*) );

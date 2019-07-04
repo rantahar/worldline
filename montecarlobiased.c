@@ -82,39 +82,21 @@ int main(int argc, char* argv[])
   feenableexcept(FE_INVALID | FE_OVERFLOW);
   #endif 
 
-  int i,n_loops,n_measure,n_average,llr_update_every;
-  long seed;
+  int i,n_loops,n_measure,n_average;
+
+  setup_lattice();
 
   /* Read in the input */
-  get_int("Sites in the t direction", &NT);
-  get_int("Sites in the x direction", &NX);
   get_int("Number of updates", &n_loops);
   get_int("Updates / measurement", &n_measure);
-  get_int("Average over", &n_average);
-  get_double("mass", &m);
-  get_double("U", &U);
-  get_double("mu", &mu);
-  get_long("Random seed", &seed);
-  get_char(" Configuration filename ", configuration_filename);
+  get_int("Updates between saves", &n_average);
+  printf("\n %d updates per measurements\n", n_measure );
+
+  read_thirring_parameters();
 
   get_char("Initial values file ", parameter_filename);
 
-
-  printf(" \n++++++++++++++++++++++++++++++++++++++++++\n");
-  //printf(" Git commit ID GIT_COMMIT_ID  \n");
-  printf(" 2D Thirring model, ( %d , %d ) lattice\n", NT, NX );
-  printf(" %d updates per measurements\n", n_measure );
-  printf(" m %f \n", m);
-  printf(" U %f \n", U);
-  printf(" mu %f \n", mu);
-  printf(" Random seed %ld\n", seed );
-  printf(" Configuration file %s\n", configuration_filename );
-  printf(" Weight file %s\n", parameter_filename );
-
-  
-  // Set up lattice variables and fields
-  setup_lattice(seed);
-  read_configuration(configuration_filename);
+  printf("\n Weight file %s\n", parameter_filename );
   
   int sum_sign=0;
   setup_free_energy( n_average*n_measure );

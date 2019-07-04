@@ -69,7 +69,8 @@ EXTERN char configuration_filename[100];
 
 
 /* Worldline functions */
-void setup_lattice(long seed);
+void setup_lattice();
+void read_thirring_parameters();
 int configuration_sign();
 int update_config( int nsteps );
 void thermalise( int nsteps );

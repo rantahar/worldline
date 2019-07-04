@@ -228,47 +228,31 @@ int main(int argc, char* argv[])
   last_range_update =1;
 
   int i,n_loops,n_measure,n_average,llr_update_every;
-  long seed;
+
+  setup_lattice();
 
   /* Read in the input */
-  get_int("Sites in the t direction", &NT);
-  get_int("Sites in the x direction", &NX);
   get_int("Number of updates", &n_loops);
   get_int("Updates / measurement", &n_measure);
-  get_int("Average over", &n_average);
-  get_double("mass", &m);
-  get_double("U", &U);
-  get_double("mu", &mu);
-  get_long("Random seed", &seed);
-  get_char("Configuration filename ", configuration_filename);
+  get_int("Updates between saves", &n_average);
+  printf("\n %d updates per measurements\n", n_measure );
+
+  read_thirring_parameters();
 
   #ifdef SAD
   get_double("Wang Landau Tmin", &Tmin);
+  printf("\n Wang Landau Tmin %g\n", Tmin );
   #else
-  get_int("Wang Landay t0", &constant_steps);
+  get_int("Wang Landau t0", &constant_steps);
   get_double("Wang Landau stepsize", &stepsize);
+  printf("\n Wang Landau t0 %d\n", constant_steps );
+  printf("\n Wang Landau step size %g\n", stepsize );
   #endif
   get_double("Wang Landau tolerance", &tolerance);
-  get_char("Initial values file ", parameter_filename);
+  get_char("Result filename ", parameter_filename);
 
-
-  printf(" \n++++++++++++++++++++++++++++++++++++++++++\n");
-  //printf(" Git commit ID GIT_COMMIT_ID  \n");
-  printf(" 2D Thirring model, ( %d , %d ) lattice\n", NT, NX );
-  printf(" %d updates per measurements\n", n_measure );
-  printf(" m %f \n", m);
-  printf(" U %f \n", U);
-  printf(" mu %f \n", mu);
-  printf(" Random seed %ld\n", seed );
-  printf(" Configuration file %s\n", configuration_filename );
-  printf(" Wang Landau tolerance %g\n", tolerance );
-  printf(" Wang Landau Tmin %g\n", Tmin );
-  printf(" Wang Landau weight file %s\n", parameter_filename );
-
-  
-  // Set up lattice variables and fields
-  setup_lattice(seed);
-  read_configuration(configuration_filename);
+  printf("\n Wang Landau tolerance %g\n", tolerance );
+  printf("\n Wang Landau weight file %s\n", parameter_filename );
   
   int sum_sign=0;
   WangLaundau_setup( n_average*n_measure );

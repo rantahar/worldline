@@ -88,32 +88,16 @@ int main(int argc, char* argv[])
   #endif 
 
   int i,n_loops,n_measure,n_average,llr_update_every;
-  long seed;
+
+  setup_lattice();
 
   /* Read in the input */
-  get_int("Sites in the t direction", &NT);
-  get_int("Sites in the x direction", &NX);
   get_int("Number of updates", &n_loops);
   get_int("Updates / measurement", &n_measure);
-  get_int("Average over", &n_average);
+  get_int("Updates between saves", &n_average);
+  printf("\n %d updates per measurements\n", n_measure );
 
-  get_double("mass", &m);
-  get_double("U", &U);
-  get_double("mu", &mu);
-
-  get_long("Random seed", &seed);
-  get_char(" Configuration filename ", configuration_filename);
-
-
-  printf(" \n++++++++++++++++++++++++++++++++++++++++++\n");
-  //printf(" Git commit ID GIT_COMMIT_ID  \n");
-  printf(" 2D Thirring model, ( %d , %d ) lattice\n", NT, NX );
-  printf(" %d updates per measurements\n", n_measure );
-  printf(" m %f \n", m);
-  printf(" U %f \n", U);
-  printf(" mu %f \n", mu);
-  printf(" Random seed %ld\n", seed );
-  printf(" Configuration file %s\n", configuration_filename );
+  read_thirring_parameters();
 
   get_double("LLR step size", &llr_alpha);
   get_int("LLR steps with dampened decay", &llr_constant_steps);
@@ -121,15 +105,11 @@ int main(int argc, char* argv[])
   get_double("LLR initial a", &llr_a);
   get_int("Updates / LLR update", &llr_update_every);
 
-  printf(" LLR target %d\n", llr_target );
+  printf("\n LLR target %d\n", llr_target );
   printf(" LLR updated every %ld updates\n", llr_update_every );
   printf(" LLR step size %g\n", llr_alpha );
   printf(" LLr %d first steps with dampened decay\n", llr_constant_steps );
 
-  
-  // Set up lattice variables and fields
-  setup_lattice(seed);
-  read_configuration(configuration_filename);
   
   /* and the update/measure loop */
   int sum_sign=0;
