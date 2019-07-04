@@ -64,6 +64,8 @@ int main(void){
   U=0; // Need a better way to disable dimers?
     
   /* Read in the input */
+  get_int("Sites in the t direction", &NT);
+  get_int("Sites in the x direction", &NX);
   get_int("Number of updates", &n_loops);
   get_int("Updates / measurement", &n_measure);
   get_int("Average over", &n_average);

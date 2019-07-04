@@ -12,6 +12,10 @@
 
 #include "worldline.h"
 
+/* For saving a field before update with accept/reject */
+int **old_field;
+int **old_diraclink;
+
 /* Saves the current configuration in a file */
 void write_configuration(char * filename){
   FILE * config_file;
@@ -70,8 +74,6 @@ void read_configuration(char * filename){
 
 
 /* Make a copy of the fields */
-int old_field[NT][NX];
-int old_diraclink[NT][NX];
 void save_config(){
   for( int x=0; x<NX; x++ ) for( int t=0; t<NT; t++ ){
     old_field[t][x] = field[t][x];
@@ -331,9 +333,14 @@ int negative_loops(){
   int sector = 0;
 
   // Mark the checked sites to avoid double counting
-  int checked[NT][NX];
-  for(int t=0; t<NT; t++) for(int x=0;x<NX;x++)
+  int **checked = malloc( NT*sizeof(int *) );
+
+  for(int t=0; t<NT; t++){
+    checked[t] = malloc( NX*sizeof(int) );
+    for(int x=0;x<NX;x++){
     checked[t][x] = 0;
+    }
+  }
 
   // Cycle trough all the sites and follow around each loop
   for(int t=0; t<NT; t++) for(int x=0;x<NX;x++) if(field[t][x]==0) if(checked[t][x] == 0){
@@ -354,6 +361,11 @@ int negative_loops(){
       sector += 1;
     }
   }
+
+  for(int t=0; t<NT; t++){
+    free(checked[t]);
+  }
+  free(checked);
   
   return sector;
 }
@@ -1028,10 +1040,14 @@ void setup_lattice(long seed){
   /* Allocate location and field arrays */
   field = malloc( NT*sizeof(int *) );
   diraclink = malloc( NT*sizeof(int *) );
+  old_field = malloc( NT*sizeof(int *) );
+  old_diraclink = malloc( NT*sizeof(int *) );
   eta = malloc( NT*sizeof(int *) );
   for (int t=0; t<NT; t++){
     field[t] = malloc( (NX+1)*sizeof(int) );
     diraclink[t] = malloc( (NX+1)*sizeof(int) );
+    old_field[t] = malloc( (NX+1)*sizeof(int) );
+    old_diraclink[t] = malloc( (NX+1)*sizeof(int) );
     eta[t] = malloc( (NX+1)*sizeof(int *) );
     for (int x=0; x<NX+1; x++) {
      eta[t][x] = malloc( 2*sizeof(int) );

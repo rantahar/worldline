@@ -15,8 +15,8 @@
 #endif
 
 /* Lattice size and dimensions */
-#define NT 200
-#define NX 40
+EXTERN int NX;
+EXTERN int NT;
 
 
 #define VOLUME (NT*NX)
