@@ -1,7 +1,7 @@
 
 
 #define MAIN
-//#define SAD
+#define SAD
 
 #include "worldline.h"
 
