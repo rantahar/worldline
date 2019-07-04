@@ -11,17 +11,18 @@ from calc_sign import calc_sign
 nruns = 20
 nnodes = 1
 
+NT = 64
+NX = 64
 nupdates = 10000
 nmeasure = 1
 U = 0
 m = 0.1
 mu= 0
-step = 10
+step = 0.01
 init_nstep = 10000
+tolerance = -40
 
-tolerance = 0.01
-sector_tolerance = 0.001*tolerance
-min_accuracy = 1e-7
+accuracy = 1e-7
 max_iterations = 1000
 
 seed = random.randint(0,99999999)
@@ -36,17 +37,19 @@ else :
 def new_parameter_file( run ):
   global seed
   seed = seed+1
-  parameter = f'''{nupdates}
+  parameter = f'''{NT}
+{NX}
+{seed}
+.config_{run}
+{nupdates}
 {nmeasure}
 {int(nupdates/nmeasure)}
 {m}
 {U}
 {mu}
-{seed}
-.config_{run}
 {init_nstep}
 {step}
--40
+{tolerance}
 WL_F_{run}'''
   
   text_file = open(f".parameter_{run}", "w")
@@ -84,6 +87,6 @@ for i in range(max_iterations):
   sys.stdout.flush()
   
   error = sign_std/abs(sign_mean)
-  if( error < tolerance ):
+  if( error < accuracy ):
     break
   
