@@ -7,7 +7,7 @@ from scipy.optimize import curve_fit
 import time
 
 
-min_weight = -14
+min_weight = -30
 polynomial_degree = 2
 
 def fit_function( x, *p ):
@@ -67,30 +67,39 @@ def plot_fit(par, center, width):
   plot.plot( x, y )
 
 
-def read_data( nruns ):
-  wl_f = []
-  for run in range(nruns):
-    file_open = False
-    while not file_open:
-      try:
-        text_file = open(f"WL_F_{run}", "r")
-        file_open = True
-      except:
-        time.sleep(1)
-        continue
-    wl_f_n = []
-    for line in text_file:
-      values = line.split()
-      wl_f_n.append(values[0])
-    wl_f.append(wl_f_n[:-1])
-    text_file.close()
+def read_data( datafilename ):
+  weights = []
+  with open(datafilename) as datafile:
+    for line in datafile:
+      if "SECTOR" in line:
+        try:
+          tag, sector, w, wf = line.split(' ')
+          sector = int(sector)
+          wf = float(wf)
+          if sector >= len(weights):
+            weights.append([wf])
+          else :
+            weights[sector].append(wf)
+        except:
+          pass
 
-  wl_f = np.array(wl_f).astype(np.float)
-  weight_sums = np.sum(np.exp(wl_f), axis=1)
+  nmeas = min( [len(m) for m in weights] )
+  nblocks = 20
+  nmeas = int(nmeas/nblocks)*nblocks
+  weights = [m[0:nmeas] for m in weights]
+
+  wl_w = np.array(weights).astype(np.float)
+  nsectors, nmeas = wl_w.shape
+  wl_w = wl_w.reshape((nsectors, nblocks, int(nmeas/nblocks)))
+  wl_w = wl_w.mean(2)
+
+  wl_f = np.log(wl_w)
+  wl_f[wl_f == -np.inf] = -100
+  weight_sums = np.sum(np.exp(wl_f), axis=0)
   energy_correction = np.log(weight_sums)
-  wl_f = ( wl_f.transpose() - energy_correction ).transpose()
+  wl_f = ( wl_f - energy_correction )
 
-  return wl_f
+  return wl_f.T
 
 
 def window_smooth( x, wl_f, width, eval = 0 ):
@@ -101,8 +110,8 @@ def window_smooth( x, wl_f, width, eval = 0 ):
     return wl_f[:,x]
 
 
-def plot_window_fit( nruns, center, width ):
-  wl_f = read_data( nruns )
+def plot_window_fit( datafilename, center, width ):
+  wl_f = read_data( datafilename )
 
   plot_window(wl_f, center, width)
 
@@ -112,8 +121,8 @@ def plot_window_fit( nruns, center, width ):
   plot.show()
 
 
-def plot_smoothing( nruns, width, max ):
-  wl_f = read_data( nruns )
+def plot_smoothing( datafilename, width, max ):
+  wl_f = read_data( datafilename )
   wl_f = wl_f[:,0:max]
 
   mean = np.mean(wl_f, axis=0)
@@ -150,8 +159,8 @@ def plot_smoothing( nruns, width, max ):
   plot.show()
 
 
-def average_sign( nruns, width, max, print_weights = False ):
-  wl_f = read_data( nruns )
+def average_sign( datafilename, width, max, print_weights = False ):
+  wl_f = read_data( datafilename )
   wl_f = wl_f[:,:max]
 
   mean = wl_f.mean(axis=0)
@@ -189,7 +198,7 @@ def average_sign( nruns, width, max, print_weights = False ):
 
 if __name__ == "__main__":
   if len(sys.argv) > 3 :
-    nruns = int(sys.argv[1])
+    datafilename = sys.argv[1]
     width = float(sys.argv[2])
     max_sector = int(sys.argv[3])
     if len(sys.argv) > 4:
@@ -199,12 +208,12 @@ if __name__ == "__main__":
       do_plot = False
       print_weights = False
   else:
-    print("usage: fit.py Nruns window_width max_sector ")
+    print("usage: fit.py filename window_width max_sector ")
 
   if do_plot:
-    plot_smoothing(nruns, width, max_sector)
+    plot_smoothing(datafilename, width, max_sector)
   else:
-    mean, sigma = average_sign(nruns, width, max_sector, print_weights)
+    mean, sigma = average_sign(datafilename, width, max_sector, print_weights)
     print(mean, sigma)
 
   
