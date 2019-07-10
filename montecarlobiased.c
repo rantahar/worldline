@@ -35,6 +35,20 @@ void setup_free_energy( ){
 }
 
 
+double subtracted_weight(int s){
+#ifdef SUBTRACT
+  int even = ((int)s/2)*2;
+  int odd = even+1;
+  double weight = 0.5*log(exp(Sampling_F[even]) + exp(Sampling_F[odd]));
+  //double relative = exp(Sampling_F[even]) - exp(Sampling_F[odd]);
+  //double logexp = log(fabs(relative));
+  //weight -= logexp;
+  //printf("Sector %d, weight %g, relative %g, logexp %g\n", s, weight, relative, logexp);
+#else
+  double weight = Sampling_F[s];
+#endif
+  return weight;
+}
 
 int transition_accept(){
   int accept = 1;
@@ -43,8 +57,8 @@ int transition_accept(){
   sector = negative_loops();
   if( sector != current_sector ){
     double minimum =-40;
-    double e1 = Sampling_F[current_sector];
-    double e2 = Sampling_F[sector];
+    double e1 = subtracted_weight(current_sector);
+    double e2 = subtracted_weight(sector);
     if(e1 < minimum)
       e1 = minimum;
     if(e2 < minimum)
