@@ -16,12 +16,17 @@ void setup_free_energy( ){
   int initialized = 0;
   
   if(config_file) {
+    double weight_sum = 0;
     printf(" Reading initial free energy\n" );
     for( int s=0; s<MAX_SECTOR; s++){
       char tmp1[100];
       fscanf(config_file, "%lf %s\n", &Sampling_F[s], tmp1);
+      weight_sum += exp(Sampling_F[s]);
     }
     fclose(config_file);
+    for( int s=0; s<MAX_SECTOR; s++){
+      Sampling_F[s] -= log(weight_sum);
+    }
   } else {
     errormessage("Could not read weight file!\n");
   }
