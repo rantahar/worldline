@@ -119,7 +119,8 @@ int main(int argc, char* argv[])
 
   printf("\n Weight file %s\n", parameter_filename );
   
-  int sum_sign=0;
+  double sum_sign=0;
+  double sum_weight=0;
   setup_free_energy( n_average*n_measure );
   double sectors[MAX_SECTOR];
   for(int i=0; i<MAX_SECTOR; i++){
@@ -145,8 +146,10 @@ int main(int argc, char* argv[])
     gettimeofday(&start,NULL);
 
     int sector = current_sector;
-    int sign = 1-(sector%2)*2;
-    sum_sign += sign;
+    double sign = 1-(sector%2)*2;
+    double weight = exp(subtracted_weight(sector));
+    sum_weight += weight;
+    sum_sign += weight*sign;
 
     sectors[sector]++;
 
@@ -161,14 +164,16 @@ int main(int argc, char* argv[])
       updatetime = 0; measuretime = 0; num_accepted=0;
 
       printf("SIGN %g\n", (double)sum_sign/n_average);
+      printf("WEIGHT %g\n", (double)sum_weight/n_average);
       for(int s=0; s<MAX_SECTOR; s++){
-        printf("SECTOR %d %g\n", s, sectors[s]/(double)n_average);
+        printf("SECTOR %d %g %g\n", s, sectors[s]/(double)n_average, exp(subtracted_weight(s))*sectors[s]/(double)n_average);
         sectors[s] = 0;
       }
 
       write_configuration(configuration_filename);
 
       sum_sign = 0;
+      sum_weight = 0;
     }
       
     gettimeofday(&start,NULL);
