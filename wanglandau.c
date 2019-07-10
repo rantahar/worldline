@@ -145,7 +145,7 @@ void WangLaundau_update(sector){
   double e = t0 + WL_nstep/l;
   double d = t0 + st2/(max_Ns*l);
   step = e/d;
-  printf("SAD %g %d %d %g %g %g\n", step, last_range_update, WL_nstep, t0, e, d);
+  //printf("SAD %g %d %d %g %g %g\n", step, last_range_update, WL_nstep, t0, e, d);
   WangLaundau_F[sector] += step;
   if( step <= 0 ){
     printf("Negative step in SAD %g %g %g\n",step, e, d);
@@ -293,6 +293,10 @@ int main(int argc, char* argv[])
       updatetime = 0; measuretime = 0;
 
       printf("SIGN %g\n", (double)sum_sign/n_average);
+
+      for(int s=0; s<MAX_SECTOR; s++){
+        printf("WL_F %d %g\n", s, WangLaundau_F[s]);
+      }
 
       WangLaundau_write_energy();
       write_configuration(configuration_filename);
