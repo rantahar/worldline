@@ -8,6 +8,7 @@
 double Sampling_F[MAX_SECTOR];
 char parameter_filename[100];
 int current_sector;
+int num_accepted=0;
 
 
 void setup_free_energy( ){
@@ -68,6 +69,7 @@ int transition_accept(){
     if( mersenne() < weight ){
       current_sector = sector;
       accept = 1;
+      num_accepted++;
     } else {
       accept = 0;
     }
@@ -153,9 +155,10 @@ int main(int argc, char* argv[])
 
     if(i%n_average==0){
       printf("\n%d, %d updates in %.3g seconds\n", i*n_measure, n_average*n_measure, 1e-6*updatetime);
+      printf("%d, acceptance %g\n", i*n_measure, num_accepted/((double)n_average*n_measure));
       printf("%d, %d measurements in %.3g seconds\n", i*n_measure, n_average, 1e-6*measuretime);
 
-      updatetime = 0; measuretime = 0;
+      updatetime = 0; measuretime = 0; num_accepted=0;
 
       printf("SIGN %g\n", (double)sum_sign/n_average);
       for(int s=0; s<MAX_SECTOR; s++){
