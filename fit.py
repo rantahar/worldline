@@ -1,14 +1,40 @@
 
 import os
 import sys
+import math
 import numpy as np
 import matplotlib.pyplot as plot
 from scipy.optimize import curve_fit
 import time
 
 
-min_weight = -30
+min_weight = -40
 polynomial_degree = 2
+
+def jacknife(vector):
+  nsectors, nmeas = vector.shape
+  nblocks = min(40, nmeas)
+
+  nmeas = int(nmeas/nblocks)*nblocks
+  vector_cut = vector[:,0:nmeas]
+
+  vector_cut = vector_cut.reshape((nsectors, nblocks, int(nmeas/nblocks)))
+  vector_cut = vector_cut.mean(2)
+
+  idx = np.arange(nblocks)
+  jkvector = np.array([ np.mean(vector_cut[:,idx!=i],1) for i in range(nblocks) ])
+  return jkvector.T
+
+def jackknife_mean(vector):
+  return vector.mean(1)
+
+def jackknife_sigma(vector):
+  n = vector.shape[1]
+  mean = jackknife_mean(vector)
+  diff = vector.T-mean
+  sigmasq = (n-1)/(n+0.0) * np.sum( diff**2, 0 )
+  return np.sqrt(sigmasq)
+
 
 def fit_function( x, *p ):
   r = np.polyval(p, x)
@@ -16,8 +42,8 @@ def fit_function( x, *p ):
 
 
 def plot_window(wl_f, center, width):
-  mean = np.mean(wl_f, axis=0)
-  sigma = np.std(wl_f, axis=0)/np.sqrt((wl_f.shape[0]-1))
+  mean = jackknife_mean(wl_f.T)
+  mean = jackknife_sigma(wl_f.T)
   x = np.linspace(0, sigma.shape[0]-1, sigma.shape[0])
 
   window = np.logical_and(x > center-width-1, x < center+width+1)
@@ -57,7 +83,7 @@ def evaluate_fit(x, par):
 
 def average_fit(x, par):
   fit = evaluate_fit(x, par)
-  mean = np.mean( fit, axis=0)
+  mean = jackknife_mean( fit.T )
   return mean
 
 
@@ -78,23 +104,19 @@ def read_data( datafilename ):
           wf = float(wf)
           if sector >= len(weights):
             weights.append([wf])
-          else :
+          else:
             weights[sector].append(wf)
         except:
           pass
 
   nmeas = min( [len(m) for m in weights] )
-  nblocks = 20
-  nmeas = int(nmeas/nblocks)*nblocks
   weights = [m[0:nmeas] for m in weights]
 
   wl_w = np.array(weights).astype(np.float)
-  nsectors, nmeas = wl_w.shape
-  wl_w = wl_w.reshape((nsectors, nblocks, int(nmeas/nblocks)))
-  wl_w = wl_w.mean(2)
+  wl_w = jacknife( wl_w )
 
   wl_f = np.log(wl_w)
-  wl_f[wl_f == -np.inf] = -100
+  wl_f[wl_f < min_weight-10] = min_weight-10
   weight_sums = np.sum(np.exp(wl_f), axis=0)
   energy_correction = np.log(weight_sums)
   wl_f = ( wl_f - energy_correction )
@@ -112,7 +134,6 @@ def window_smooth( x, wl_f, width, eval = 0 ):
 
 def plot_window_fit( datafilename, center, width ):
   wl_f = read_data( datafilename )
-
   plot_window(wl_f, center, width)
 
   par = fit_window(wl_f, center, width)
@@ -125,8 +146,8 @@ def plot_smoothing( datafilename, width, max ):
   wl_f = read_data( datafilename )
   wl_f = wl_f[:,0:max]
 
-  mean = np.mean(wl_f, axis=0)
-  sigma = np.std(wl_f, axis=0)/np.sqrt((wl_f.shape[0]-1))
+  mean = jackknife_mean(wl_f.T)
+  sigma = jackknife_sigma(wl_f.T)
   x = np.linspace(0, sigma.shape[0]-1, sigma.shape[0])
   plot.errorbar( x, mean, sigma, fmt='o' , capsize=4 )
 
@@ -145,7 +166,8 @@ def plot_smoothing( datafilename, width, max ):
   x = np.linspace(x.min(), x.max(), x.shape[0]*intermediate_points)
   for i in range(x.shape[0]):
     point = x[i]-x.min()
-    value = window_smooth(point, wl_f, width).mean(axis=0)
+    value = np.array([window_smooth(point, wl_f, width)])
+    value = jackknife_mean(value)
     wl_f_fit.append(value)
   wl_f_fit = np.array(wl_f_fit)
 
@@ -163,8 +185,8 @@ def average_sign( datafilename, width, max, print_weights = False ):
   wl_f = read_data( datafilename )
   wl_f = wl_f[:,:max]
 
-  mean = wl_f.mean(axis=0)
-  sigma = np.std(wl_f, axis=0)/np.sqrt((wl_f.shape[0]-1))
+  mean = jackknife_mean(wl_f.T)
+  sigma = jackknife_sigma(wl_f.T)
   x = np.linspace(0, mean.shape[0]-1, mean.shape[0])
   window = mean > min_weight
   print(window.sum(), "sectors above minimal weight")
@@ -179,19 +201,19 @@ def average_sign( datafilename, width, max, print_weights = False ):
   for i in range(x.shape[0]):
     free_energy = window_smooth( i, wl_f, width )
     free_energies.append(free_energy)
-  diffs = np.abs(np.array(free_energies).mean(axis=1) - mean)/sigma
+  diffs = np.abs(jackknife_mean(np.array(free_energies)) - mean)/sigma
   print("mean diff:", diffs.mean())
   print("max diff:", diffs.max())
 
-  weights = np.exp(np.array(free_energies).transpose())
+  weights = np.exp(np.array(free_energies).T)
   sign = -(x%2-0.5)*2
   weights = weights*sign
   
   sign = np.sum(weights, axis=1)
-  mean = np.mean(sign)
-  sigma = np.std(sign)/(np.sqrt(sign.shape[0]-1))
+  mean = jackknife_mean(np.array([sign]))[0]
+  sigma = jackknife_sigma(np.array([sign]))[0]
   if print_weights :
-    print(weights.mean(axis=0))
+    print(jackknife_mean(weights.T))
   return [mean, sigma]
   
 
@@ -201,9 +223,10 @@ if __name__ == "__main__":
     datafilename = sys.argv[1]
     width = float(sys.argv[2])
     max_sector = int(sys.argv[3])
-    if len(sys.argv) > 4:
-      do_plot = (sys.argv[4] == 'plot')
-      print_weights = (sys.argv[4] == 'weights')
+    min_weight = int(sys.argv[4])
+    if len(sys.argv) > 5:
+      do_plot = (sys.argv[5] == 'plot')
+      print_weights = (sys.argv[5] == 'weights')
     else :
       do_plot = False
       print_weights = False
