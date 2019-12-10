@@ -43,7 +43,7 @@ EXTERN int NT;
 #define flip_exit_propability 0.2
 
 #define WITH_MASS_MONOMERS
-#define MAX_SECTOR 301
+#define MAX_SECTOR 1001
 
 
 
