@@ -142,6 +142,37 @@ def plot_window_fit( datafilename, center, width ):
   plot.show()
 
 
+
+
+
+# Option to fit to global fit function
+degree = 8
+def general( x, *p ):
+  r=0
+  for i in range(degree):
+    r += p[i] * x**i
+  return r
+
+def general_fit(x, wl_f):
+  if general_fit.init:
+    # do the fit on the first time
+    sigma = np.std(wl_f, axis=0)/np.sqrt((wl_f.shape[0]-1))
+    mean = np.mean(wl_f, axis=0)
+    for m in range(wl_f.shape[0]):
+      parameters, conv = curve_fit(general, x, wl_f[m], [0]*degree, sigma=sigma)
+      general_fit.par.append(parameters)
+    general_fit.init = False
+
+  # evaluate
+  fit_evaluated = []
+  for m in range(len(general_fit.par)):
+    fit_evaluated.append(general(x, *general_fit.par[m]))
+  return np.array(fit_evaluated)
+general_fit.init = True
+general_fit.par = []
+
+
+
 def plot_smoothing( datafilename, width, max ):
   wl_f = read_data( datafilename )
   wl_f = wl_f[:,0:max]
@@ -151,34 +182,38 @@ def plot_smoothing( datafilename, width, max ):
   x = np.linspace(0, sigma.shape[0]-1, sigma.shape[0])
   plot.errorbar( x, mean, sigma, fmt='o' , capsize=4 )
 
-  max_i = 0
-  for i in range(x.shape[0]):
-    if mean[i] > min_weight:
-      max_i = i+1
+  window = mean > min_weight
+  print(window.sum(), "sectors above minimal weight")
       
-  print("Max sector used", max_i)
-  wl_f = wl_f[:,:max_i]
-  x = x[:max_i]
+  mean = mean[window]
+  sigma = sigma[window]
+  wl_f = wl_f[:,window]
+  x = x[window]
 
-  wl_f_fit = []
+  wl_f_fit = jackknife_mean( general_fit(x, wl_f).T )
+
   intermediate_points = int(100/x.shape[0]+1)
   print(intermediate_points)
-  x = np.linspace(x.min(), x.max(), x.shape[0]*intermediate_points)
-  for i in range(x.shape[0]):
-    point = x[i]-x.min()
-    value = np.array([window_smooth(point, wl_f, width)])
-    value = jackknife_mean(value)
-    wl_f_fit.append(value)
-  wl_f_fit = np.array(wl_f_fit)
+  #x = np.linspace(x.min(), x.max(), x.shape[0]*intermediate_points)
+  #wl_f_fit = general_fit(x, wl_f)
+  
+  #wl_f_fit = []
+  #for i in range(x.shape[0]):
+  #  point = x[i]-x.min()
+  #  value = np.array([window_smooth(point, wl_f, width)])
+  #  value = jackknife_mean(value)
+  #  wl_f_fit.append(value)
+  #wl_f_fit = np.array(wl_f_fit)
 
   plot.plot( x, wl_f_fit )
 
   plot.xlabel('Negative loops')
   plot.ylabel('F')
   plot.ylim(int(1.1*min_weight), int(0.5*wl_f_fit.max()))
-  plot.xlim(-1, int(1.1*x.max()))
+  plot.xlim(int(0.9*x.min()), int(1.1*x.max()))
 
   plot.show()
+
 
 
 def average_sign( datafilename, width, max, print_weights = False ):
@@ -196,14 +231,17 @@ def average_sign( datafilename, width, max, print_weights = False ):
   wl_f = wl_f[:,window]
   x = x[window]
 
-  weights = []
-  free_energies = []
-  for i in range(x.shape[0]):
-    free_energy = window_smooth( i, wl_f, width )
-    free_energies.append(free_energy)
+  free_energies =  general_fit(x, wl_f).T 
+
+  #free_energies = []
+  #for i in range(x.shape[0]):
+  #  free_energy = window_smooth( i, wl_f, width )
+  #  free_energies.append(free_energy)
+
   diffs = np.abs(jackknife_mean(np.array(free_energies)) - mean)/sigma
   print("mean diff:", diffs.mean())
   print("max diff:", diffs.max())
+  print("chi squeared / d.o.f.:", (diffs*diffs).sum()/(diffs.shape[0]-degree) )
 
   weights = np.exp(np.array(free_energies).T)
   sign = -(x%2-0.5)*2
@@ -223,7 +261,7 @@ if __name__ == "__main__":
     datafilename = sys.argv[1]
     width = float(sys.argv[2])
     max_sector = int(sys.argv[3])
-    min_weight = int(sys.argv[4])
+    min_weight = float(sys.argv[4])
     if len(sys.argv) > 5:
       do_plot = (sys.argv[5] == 'plot')
       print_weights = (sys.argv[5] == 'weights')
@@ -240,3 +278,7 @@ if __name__ == "__main__":
     print(mean, sigma)
 
   
+
+
+
+
